@@ -23,7 +23,7 @@ function withTimeout<T>(p: Promise<T>, ms: number, label: string): Promise<T> {
   ]);
 }
 
-test('MCP server: listTools + eight tools over stdio', async (t) => {
+test('MCP server: listTools + dataset tools over stdio', async (t) => {
   const transport = new StdioClientTransport({
     command: process.execPath,
     args: [TSX_CLI, SERVER],
@@ -37,7 +37,10 @@ test('MCP server: listTools + eight tools over stdio', async (t) => {
     const tools = await withTimeout(client.listTools(), 10000, 'listTools');
     assert.deepEqual(
       tools.tools.map((x) => x.name).sort(),
-      ['breeding_plan', 'find_breeding_pairs', 'get_breeding_result', 'get_item', 'get_pal', 'search_items', 'search_pals', 'search_skills'],
+      [
+        'breeding_plan', 'find_breeding_pairs', 'get_breeding_result', 'get_game_news', 'get_item', 'get_pal',
+        'search_items', 'search_pals', 'search_skills', 'wiki_get_page', 'wiki_search',
+      ],
     );
 
     const search = await withTimeout(client.callTool({ name: 'search_pals', arguments: { query: 'anub' } }), 10000, 'search_pals');

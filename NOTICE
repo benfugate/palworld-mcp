@@ -30,3 +30,18 @@ Required attribution when redistributing the dataset:
 
     Dataset: palworld-mcp (CC BY 4.0), data sourced from paldb.cc;
     breeding data from palcalc-tools (MIT); game data © Pocketpair.
+
+Live tools (fetched at request time, never shipped in this repository):
+
+4. Palworld Wiki (https://palworld.wiki.gg), used by wiki_search and
+   wiki_get_page. Community content under CC BY-SA; every result carries
+   the URL of the page it came from.
+
+5. Steam news feed for Palworld (app 1623730), used by get_game_news.
+   Official announcements and patch notes written by Pocketpair, Inc.
+
+Third-party code:
+
+   src/http-server.ts and src/markdown.ts are ported from
+   benfugate/mcp-osrs (MIT), which adapted them from
+   maxgauthier12/mcp-osrs (MIT) and OddLobster/osrs-wiki-mcp (MIT).

@@ -11,8 +11,17 @@
  *   - get_item             full record for one item (drops, shops, recipes)
  *   - search_skills        skill -> pals reverse index (active/passive/partner)
  *
- * All data is served from the shipped dataset (data/dataset.json) - no network.
- * Override the dataset location with PALWORLD_MCP_DATA.
+ *   - wiki_search          live full-text search of the Palworld Wiki (palworld.wiki.gg)
+ *   - wiki_get_page        one wiki page (or one section of it) as markdown
+ *   - get_game_news        official Pocketpair announcements / patch notes (Steam)
+ *
+ * The first eight tools are served from the shipped dataset (data/dataset.json)
+ * with no network. Override the dataset location with PALWORLD_MCP_DATA.
+ * The wiki_* and get_game_news tools fetch live data; set PALWORLD_MCP_OFFLINE=1
+ * to leave them out.
+ *
+ * Transport: stdio by default; MCP_TRANSPORT=http serves Streamable HTTP on
+ * MCP_HOST:MCP_PORT (default 127.0.0.1:8000) at /mcp, health at /healthz.
  *
  * Logs go to stderr only: stdout is reserved for the MCP stdio protocol.
  */
@@ -21,6 +30,8 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { z } from 'zod';
 import { loadDataset, PalworldData, type ItemRecord, type PalRecord } from './dataset.js';
 import { breedingPlan } from './planner.js';
+import { startHttpServer } from './http-server.js';
+import { registerLiveTools } from './live-tools.js';
 
 function fail(message: string) {
   return { content: [{ type: 'text' as const, text: message }], isError: true };
@@ -168,7 +179,14 @@ try {
   process.exit(1);
 }
 
-const server = new McpServer({ name: 'palworld-mcp', version: '1.1.0' });
+const SERVER_VERSION = '1.2.0';
+const liveToolsEnabled = !/^(1|true|yes)$/i.test(process.env.PALWORLD_MCP_OFFLINE ?? '');
+
+// One server per client: stdio builds a single instance, the HTTP transport
+// builds one per session. The body is left unindented to keep the diff against
+// upstream small.
+function createServer(): McpServer {
+const server = new McpServer({ name: 'palworld-mcp', version: SERVER_VERSION });
 
 server.registerTool(
   'search_pals',
@@ -429,12 +447,26 @@ server.registerTool(
   },
 );
 
-const transport = new StdioServerTransport();
-await server.connect(transport);
+if (liveToolsEnabled) registerLiveTools(server, { version: SERVER_VERSION, datasetGameVersion: data.dataset.gameVersion });
 
-for (const sig of ['SIGINT', 'SIGTERM'] as const) {
-  process.on(sig, async () => {
-    await server.close();
-    process.exit(0);
-  });
+return server;
+}
+
+const transportKind = (process.env.MCP_TRANSPORT ?? 'stdio').toLowerCase();
+if (transportKind === 'http' || transportKind === 'streamable-http') {
+  // startHttpServer wires its own SIGINT/SIGTERM shutdown.
+  await startHttpServer({ serverFactory: createServer });
+} else if (transportKind === 'stdio') {
+  const server = createServer();
+  await server.connect(new StdioServerTransport());
+
+  for (const sig of ['SIGINT', 'SIGTERM'] as const) {
+    process.on(sig, async () => {
+      await server.close();
+      process.exit(0);
+    });
+  }
+} else {
+  console.error(`[palworld-mcp] unknown MCP_TRANSPORT "${transportKind}" - use "stdio" or "http"`);
+  process.exit(1);
 }
